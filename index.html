@@ -1,0 +1,303 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width, initial-scale=1.0">
+<title>Spin a Decision</title>
+<style>
+  :root {
+    --bg: #14121a;
+    --panel: #1e1b26;
+    --accent: #ff5da2;
+    --accent2: #5da2ff;
+    --text: #f5f3f7;
+    --muted: #9c96ab;
+  }
+  * { box-sizing: border-box; }
+  body {
+    margin: 0;
+    min-height: 100vh;
+    background: radial-gradient(circle at top, #241f30, var(--bg));
+    color: var(--text);
+    font-family: -apple-system, BlinkMacSystemFont, "Segoe UI", Roboto, sans-serif;
+    display: flex;
+    flex-direction: column;
+    align-items: center;
+    padding: 40px 16px 80px;
+  }
+  h1 {
+    font-size: 2rem;
+    margin-bottom: 4px;
+    letter-spacing: -0.02em;
+  }
+  p.subtitle {
+    color: var(--muted);
+    margin-top: 0;
+    margin-bottom: 32px;
+    text-align: center;
+  }
+  .wheel-wrap {
+    position: relative;
+    width: min(340px, 80vw);
+    height: min(340px, 80vw);
+    margin-bottom: 28px;
+  }
+  .pointer {
+    position: absolute;
+    top: -14px;
+    left: 50%;
+    transform: translateX(-50%);
+    width: 0;
+    height: 0;
+    border-left: 14px solid transparent;
+    border-right: 14px solid transparent;
+    border-top: 22px solid var(--accent);
+    z-index: 3;
+    filter: drop-shadow(0 2px 4px rgba(0,0,0,0.4));
+  }
+  #wheel {
+    width: 100%;
+    height: 100%;
+    border-radius: 50%;
+    border: 6px solid var(--panel);
+    box-shadow: 0 0 0 2px rgba(255,255,255,0.05), 0 20px 40px rgba(0,0,0,0.4);
+    transition: transform 4.5s cubic-bezier(0.17, 0.89, 0.32, 1.01);
+  }
+  .hub {
+    position: absolute;
+    top: 50%; left: 50%;
+    width: 20px; height: 20px;
+    background: var(--text);
+    border-radius: 50%;
+    transform: translate(-50%, -50%);
+    box-shadow: 0 0 0 4px var(--panel);
+    z-index: 2;
+  }
+  button#spin {
+    background: linear-gradient(135deg, var(--accent), var(--accent2));
+    border: none;
+    color: white;
+    font-weight: 700;
+    font-size: 1rem;
+    padding: 14px 36px;
+    border-radius: 999px;
+    cursor: pointer;
+    box-shadow: 0 8px 20px rgba(255, 93, 162, 0.25);
+    transition: transform 0.15s ease;
+  }
+  button#spin:active { transform: scale(0.96); }
+  button#spin:disabled { opacity: 0.5; cursor: not-allowed; }
+
+  #result {
+    margin-top: 22px;
+    min-height: 32px;
+    font-size: 1.3rem;
+    font-weight: 700;
+    text-align: center;
+  }
+
+  .panel {
+    margin-top: 40px;
+    width: min(420px, 92vw);
+    background: var(--panel);
+    border-radius: 16px;
+    padding: 20px;
+  }
+  .panel h2 {
+    font-size: 0.95rem;
+    text-transform: uppercase;
+    letter-spacing: 0.08em;
+    color: var(--muted);
+    margin-top: 0;
+  }
+  .option-row {
+    display: flex;
+    gap: 8px;
+    margin-bottom: 8px;
+  }
+  .option-row input {
+    flex: 1;
+    background: #14121a;
+    border: 1px solid #322c3f;
+    border-radius: 8px;
+    padding: 8px 10px;
+    color: var(--text);
+    font-size: 0.95rem;
+  }
+  .option-row button {
+    background: transparent;
+    border: 1px solid #322c3f;
+    color: var(--muted);
+    border-radius: 8px;
+    width: 34px;
+    cursor: pointer;
+  }
+  .panel-actions {
+    display: flex;
+    gap: 10px;
+    margin-top: 12px;
+  }
+  .panel-actions button {
+    flex: 1;
+    padding: 10px;
+    border-radius: 8px;
+    border: none;
+    cursor: pointer;
+    font-weight: 600;
+  }
+  #addOption { background: #2a2536; color: var(--text); }
+  #applyOptions { background: var(--accent2); color: #0d0d14; }
+
+  footer {
+    margin-top: 48px;
+    color: var(--muted);
+    font-size: 0.8rem;
+    text-align: center;
+  }
+</style>
+</head>
+<body>
+  <h1>🎡 Spin a Decision</h1>
+  <p class="subtitle">Can't decide? Let the wheel do it.</p>
+
+  <div class="wheel-wrap">
+    <div class="pointer"></div>
+    <svg id="wheel" viewBox="0 0 300 300"></svg>
+    <div class="hub"></div>
+  </div>
+
+  <button id="spin">Spin the wheel</button>
+  <div id="result"></div>
+
+  <div class="panel">
+    <h2>Options</h2>
+    <div id="optionList"></div>
+    <div class="panel-actions">
+      <button id="addOption">+ Add option</button>
+      <button id="applyOptions">Update wheel</button>
+    </div>
+  </div>
+
+  <footer>Built for fun. Refresh to reset your list.</footer>
+
+<script>
+const DEFAULT_OPTIONS = [
+  "Order pizza", "Cook at home", "Try new recipe",
+  "Get sushi", "Tacos", "Leftovers"
+];
+
+const COLORS = ["#ff5da2", "#5da2ff", "#ffce54", "#4ecdc4", "#a55eea", "#ff8c42", "#7bed9f", "#eb4d4b"];
+
+let options = [...DEFAULT_OPTIONS];
+let currentRotation = 0;
+let spinning = false;
+
+const wheelEl = document.getElementById("wheel");
+const resultEl = document.getElementById("result");
+const spinBtn = document.getElementById("spin");
+const optionListEl = document.getElementById("optionList");
+
+function polarToCartesian(cx, cy, r, angleDeg) {
+  const angleRad = (angleDeg - 90) * Math.PI / 180;
+  return { x: cx + r * Math.cos(angleRad), y: cy + r * Math.sin(angleRad) };
+}
+
+function drawWheel() {
+  const cx = 150, cy = 150, r = 148;
+  const n = options.length;
+  const slice = 360 / n;
+  let svg = "";
+
+  options.forEach((opt, i) => {
+    const startAngle = i * slice;
+    const endAngle = startAngle + slice;
+    const start = polarToCartesian(cx, cy, r, endAngle);
+    const end = polarToCartesian(cx, cy, r, startAngle);
+    const largeArc = slice > 180 ? 1 : 0;
+    const color = COLORS[i % COLORS.length];
+
+    svg += `<path d="M${cx},${cy} L${start.x.toFixed(2)},${start.y.toFixed(2)} A${r},${r} 0 ${largeArc} 0 ${end.x.toFixed(2)},${end.y.toFixed(2)} Z" fill="${color}" stroke="#1e1b26" stroke-width="1.5"/>`;
+
+    const labelAngle = startAngle + slice / 2;
+    const labelPos = polarToCartesian(cx, cy, r * 0.62, labelAngle);
+    svg += `<text x="${labelPos.x.toFixed(2)}" y="${labelPos.y.toFixed(2)}" fill="#14121a" font-size="12" font-weight="700" text-anchor="middle" dominant-baseline="middle" transform="rotate(${labelAngle}, ${labelPos.x.toFixed(2)}, ${labelPos.y.toFixed(2)})">${escapeXml(truncate(opt, 14))}</text>`;
+  });
+
+  wheelEl.innerHTML = svg;
+}
+
+function truncate(s, n) { return s.length > n ? s.slice(0, n - 1) + "…" : s; }
+function escapeXml(s) {
+  return s.replace(/&/g, "&amp;").replace(/</g, "&lt;").replace(/>/g, "&gt;");
+}
+
+function renderOptionInputs() {
+  optionListEl.innerHTML = "";
+  options.forEach((opt, i) => {
+    const row = document.createElement("div");
+    row.className = "option-row";
+    row.innerHTML = `
+      <input type="text" value="${opt.replace(/"/g, '&quot;')}" data-index="${i}">
+      <button data-remove="${i}" title="Remove">✕</button>
+    `;
+    optionListEl.appendChild(row);
+  });
+
+  optionListEl.querySelectorAll("button[data-remove]").forEach(btn => {
+    btn.addEventListener("click", () => {
+      const idx = parseInt(btn.dataset.remove, 10);
+      if (options.length > 2) {
+        options.splice(idx, 1);
+        renderOptionInputs();
+      }
+    });
+  });
+}
+
+document.getElementById("addOption").addEventListener("click", () => {
+  options.push("New option");
+  renderOptionInputs();
+});
+
+document.getElementById("applyOptions").addEventListener("click", () => {
+  const inputs = optionListEl.querySelectorAll("input[data-index]");
+  const updated = Array.from(inputs).map(inp => inp.value.trim()).filter(Boolean);
+  if (updated.length >= 2) {
+    options = updated;
+    drawWheel();
+    resultEl.textContent = "";
+  } else {
+    resultEl.textContent = "Add at least 2 options!";
+  }
+});
+
+spinBtn.addEventListener("click", () => {
+  if (spinning || options.length < 2) return;
+  spinning = true;
+  spinBtn.disabled = true;
+  resultEl.textContent = "";
+
+  const n = options.length;
+  const slice = 360 / n;
+  const winningIndex = Math.floor(Math.random() * n);
+  // We want the winning slice's center to land under the pointer (top, 0deg)
+  const targetSliceCenter = winningIndex * slice + slice / 2;
+  const extraSpins = 5 + Math.floor(Math.random() * 3); // 5-7 full spins
+  // Rotate wheel so that targetSliceCenter ends at top (0deg / 360deg)
+  const finalRotation = currentRotation + extraSpins * 360 + (360 - targetSliceCenter) - (currentRotation % 360);
+
+  currentRotation = finalRotation;
+  wheelEl.style.transform = `rotate(${currentRotation}deg)`;
+
+  setTimeout(() => {
+    resultEl.textContent = `🎉 ${options[winningIndex]}`;
+    spinning = false;
+    spinBtn.disabled = false;
+  }, 4600);
+});
+
+renderOptionInputs();
+drawWheel();
+</script>
+</body>
+</html>
